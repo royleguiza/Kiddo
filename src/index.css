@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    background-color: #fdf2f8; /* bg-pink-50 */
+  }
+
+  /* Theme Background Pattern */
+  .vibrant-pattern {
+    background-image: radial-gradient(#ff69b4 2px, transparent 2px), radial-gradient(#ffd700 2px, transparent 2px);
+    background-size: 40px 40px;
+    background-position: 0 0, 20px 20px;
+    opacity: 0.15;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
