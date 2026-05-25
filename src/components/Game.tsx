@@ -20,15 +20,29 @@ const COLORS = [
   '#FFC6FF', // Soft Pink
 ];
 
+const BOT_NAMES = [
+  'SugarMaster', 'CandyKing', 'SweetBreeze', 'LollipopHero', 'CookieCrush',
+  'GumdropWarrior', 'SodaPopStar', 'ChocoChamp', 'HoneyBunny', 'ToffeeTiger',
+  'MintyFresh', 'SourPatch', 'GingerSnap', 'Marshmallow', 'TaffyTornado'
+];
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover'>('menu');
   const [score, setScore] = useState(0);
   const [playerName, setPlayerName] = useState('Kiddo');
+  const [leaderboard, setLeaderboard] = useState<{name: string, score: number, self?: boolean, rank: number}[]>([]);
   const [isGlitchMode, setIsGlitchMode] = useState(false);
   const [glitchTimer, setGlitchTimer] = useState(0);
   const [sugarRush, setSugarRush] = useState(0); // 0 to 100
+
+  // Formatting function for scores (10^3 -> k, 10^6 -> M)
+  const formatScoreValue = (val: number) => {
+    if (val >= 1000000) return (val / 1000000).toFixed(2) + 'M';
+    if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+    return val.toLocaleString();
+  };
 
   // Game state stored in refs for performance (no re-renders during loop)
   const playerRef = useRef<Entity & { boost: boolean }>({
@@ -155,10 +169,10 @@ export default function Game() {
       id: Math.random().toString(36).substr(2, 9),
       x,
       y,
-      size: INITIAL_SIZE + Math.random() * 20,
+      size: INITIAL_SIZE + Math.random() * 40,
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
       type: 'bot',
-      name: `Bot ${Math.floor(Math.random() * 100)}`,
+      name: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + ' ' + (Math.floor(Math.random() * 90) + 10),
       targetX: Math.random() * WORLD_SIZE,
       targetY: Math.random() * WORLD_SIZE
     };
@@ -725,7 +739,7 @@ export default function Game() {
       if (key === 'e') {
         setIsGlitchMode(prev => {
           if (!prev) {
-            setScore(3000000);
+            setScore(30000);
             setGlitchTimer(15);
           } else {
             setGlitchTimer(0);
@@ -795,6 +809,33 @@ export default function Game() {
     return () => clearInterval(timer);
   }, [isGlitchMode, glitchTimer]);
 
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+
+    const interval = setInterval(() => {
+      const bots = entitiesRef.current
+        .filter(e => e.type === 'bot')
+        .map(b => ({ name: b.name || 'Bot', score: Math.floor(b.size * 10) }));
+      
+      const allPlayers = [
+        ...bots,
+        { name: playerName || 'You', score: Math.floor(playerRef.current.size * 10), self: true }
+      ].sort((a, b) => b.score - a.score);
+
+      const top5 = allPlayers.slice(0, 5).map((p, i) => ({ ...p, rank: i + 1 }));
+      
+      // If player is not in top 5, find their rank and add them
+      const playerIndex = allPlayers.findIndex(p => p.self);
+      if (playerIndex >= 5) {
+        top5[4] = { ...allPlayers[playerIndex], rank: playerIndex + 1 };
+      }
+
+      setLeaderboard(top5);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState, playerName]);
+
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (rect) {
@@ -847,7 +888,7 @@ export default function Game() {
           )}
           <div className="bg-white rounded-full px-6 py-2 border-2 border-pink-100 shadow-sm flex items-center gap-3">
             <span className="text-xl">🍭</span>
-            <span className="text-2xl font-black text-pink-500 tracking-tighter">{score.toLocaleString()}</span>
+            <span className="text-2xl font-black text-pink-500 tracking-tighter">{formatScoreValue(score)}</span>
           </div>
           <div className="hidden sm:flex bg-orange-400 text-white rounded-full px-6 py-2 shadow-lg items-center gap-3">
             <span className="text-xl">⭐</span>
@@ -888,22 +929,24 @@ export default function Game() {
         <aside className="w-72 flex flex-col gap-6 pointer-events-auto">
           {/* Leaderboard Card */}
           <div className="bg-white/90 rounded-[32px] p-6 shadow-xl border-2 border-pink-100 flex-1 flex flex-col">
-            <h3 className="text-xl font-black text-pink-600 mb-4 flex items-center gap-2">🏆 LEADERBOARD</h3>
+            <h3 className="text-xl font-black text-pink-600 mb-4 flex items-center gap-2">🏆 RANKING</h3>
             <div className="space-y-3 flex-1 overflow-y-auto">
-              {[
-                { name: 'KingCandy', score: '54.2k', rank: 1 },
-                { name: 'SodaPop', score: '42.1k', rank: 2 },
-                { name: 'Gumdrop', score: '38.9k', rank: 3 },
-                { name: 'PaletaFan', score: '33.5k', rank: 4 },
-                { name: playerName || 'You', score: `${(score/1000).toFixed(1)}k`, rank: 9, self: true }
-              ].map((entry, i) => (
-                <div key={i} className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all ${entry.self ? 'bg-pink-500 text-white border-pink-400 shadow-md' : 'border-transparent hover:bg-pink-50'}`}>
-                  <span className={`font-bold ${!entry.self && entry.rank === 1 ? 'text-yellow-700' : ''}`}>
-                    {entry.rank}. {entry.name}
-                  </span>
-                  <span className="font-mono font-bold opacity-80">{entry.score}</span>
+              {leaderboard.map((entry, i) => (
+                <div key={i} className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all ${entry.self ? 'bg-pink-500 text-white border-pink-400 shadow-md scale-[1.02]' : 'border-transparent hover:bg-pink-50'}`}>
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className={`font-black min-w-[24px] ${!entry.self && entry.rank === 1 ? 'text-yellow-500' : (entry.self ? 'text-white' : 'text-gray-400')}`}>
+                      {entry.rank}º
+                    </span>
+                    <span className="font-bold truncate max-w-[120px]">
+                      {entry.name}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold opacity-80 shrink-0">{formatScoreValue(entry.score)}</span>
                 </div>
               ))}
+              {leaderboard.length === 0 && (
+                <div className="text-center py-10 text-gray-300 font-bold italic">Calculando...</div>
+              )}
             </div>
           </div>
 
@@ -1005,7 +1048,7 @@ export default function Game() {
                   const newState = !isGlitchMode;
                   setIsGlitchMode(newState);
                   if (newState) {
-                    setScore(3000000);
+                    setScore(30000);
                     setGlitchTimer(15);
                   } else {
                     setGlitchTimer(0);
